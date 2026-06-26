@@ -1,0 +1,668 @@
+import { PointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { dishes } from "./data/dishes";
+import type { AppStep, Dish, RecipeMedia, ShoppingListItem, SwipeAction, SwipeActionKind, UserSelection } from "./types";
+import { buildShoppingList, categoryLabels, categoryOrder, formatQuantity } from "./utils/shopping";
+
+type PersistedState = UserSelection & {
+  step: AppStep;
+  checkedMap: Record<string, boolean>;
+  recipeIndex: number;
+};
+
+const initialState: PersistedState = {
+  step: "swipe",
+  selectedDishIds: [],
+  pendingDishIds: [],
+  skippedDishIds: [],
+  history: [],
+  servings: 2,
+  checkedMap: {},
+  recipeIndex: 0,
+};
+
+const storageKey = "what-to-eat-web-mvp";
+
+/** 拖拽触发滑动的距离阈值（px） */
+const SWIPE_THRESHOLD = 110;
+/** 拖拽过程中显示「想吃 / 跳过 / 待定」印章的距离阈值（px） */
+const STAMP_THRESHOLD = 44;
+/** 历史记录上限，防止 localStorage 无限膨胀 */
+const HISTORY_LIMIT = 50;
+/** 人份上下限 */
+const MIN_SERVINGS = 1;
+const MAX_SERVINGS = 12;
+
+function loadState(): PersistedState {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    return raw ? { ...initialState, ...JSON.parse(raw) } : initialState;
+  } catch {
+    return initialState;
+  }
+}
+
+function saveState(state: PersistedState) {
+  localStorage.setItem(storageKey, JSON.stringify(state));
+}
+
+function usePersistentState() {
+  const [state, setInnerState] = useState<PersistedState>(() => loadState());
+  const setState = (updater: (state: PersistedState) => PersistedState) => {
+    setInnerState((current) => {
+      const next = updater(current);
+      saveState(next);
+      return next;
+    });
+  };
+
+  return [state, setState] as const;
+}
+
+const remove = (items: string[], item: string) => items.filter((id) => id !== item);
+const addUnique = (items: string[], item: string) => (items.includes(item) ? items : [...items, item]);
+
+function getDishes(ids: string[]) {
+  return ids.map((id) => dishes.find((dish) => dish.id === id)).filter((dish): dish is Dish => Boolean(dish));
+}
+
+const difficultyLabel = (level: Dish["difficulty"]) =>
+  level === "easy" ? "简单" : level === "medium" ? "适中" : "进阶";
+
+function EmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <section className="empty-state">
+      <h3>{title}</h3>
+      <p>{description}</p>
+      {actionLabel && onAction ? (
+        <button className="secondary-button" onClick={onAction} type="button">
+          {actionLabel}
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
+function StepNav({ step, setStep }: { step: AppStep; setStep: (step: AppStep) => void }) {
+  if (step === "swipe") return null;
+  const steps: Array<{ key: AppStep; label: string }> = [
+    { key: "selected", label: "已选菜单" },
+    { key: "pending", label: "待定区域" },
+    { key: "shopping", label: "采购清单" },
+    { key: "recipes", label: "菜谱教学" },
+  ];
+
+  return (
+    <nav className="step-nav" aria-label="流程步骤">
+      {steps.map((item, index) => (
+        <button
+          className={`step-pill ${step === item.key ? "active" : ""}`}
+          key={item.key}
+          onClick={() => setStep(item.key)}
+          type="button"
+        >
+          <span className="step-index">{index + 1}</span>
+          <span>{item.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * 首页菜品卡片：支持指针拖拽（鼠标 / 触摸），
+ * 拖拽过程中实时显示印章，松手超过阈值触发滑动，未达阈值平滑回弹。
+ */
+function SwipeDishCard({ dish, onSwipe }: { dish: Dish; onSwipe: (action: SwipeActionKind) => void }) {
+  const [drag, setDrag] = useState({ active: false, startX: 0, startY: 0, x: 0, y: 0 });
+  // resting = 处于静止态，松手回弹时切回此态以触发 CSS 过渡
+  const [resting, setResting] = useState(true);
+
+  const absX = Math.abs(drag.x);
+  const absY = Math.abs(drag.y);
+  const label =
+    absX > absY && drag.x > STAMP_THRESHOLD
+      ? "想吃"
+      : absX > absY && drag.x < -STAMP_THRESHOLD
+        ? "跳过"
+        : drag.y < -STAMP_THRESHOLD
+          ? "待定"
+          : "";
+  const labelClass = label === "想吃" ? "like" : label === "跳过" ? "skip" : label === "待定" ? "pending" : "";
+
+  const style = drag.active
+    ? { transform: `translate(${drag.x}px, ${drag.y}px) rotate(${drag.x / 18}deg)` }
+    : { transform: `translate(${drag.x}px, ${drag.y}px) rotate(${drag.x / 18}deg)` };
+
+  const finishDrag = () => {
+    if (!drag.active) return;
+    if (absX > absY && drag.x > SWIPE_THRESHOLD) {
+      onSwipe("like");
+      return;
+    }
+    if (absX > absY && drag.x < -SWIPE_THRESHOLD) {
+      onSwipe("skip");
+      return;
+    }
+    if (drag.y < -SWIPE_THRESHOLD) {
+      onSwipe("pending");
+      return;
+    }
+    // 未达阈值：平滑回弹
+    setResting(true);
+    setDrag({ active: false, startX: 0, startY: 0, x: 0, y: 0 });
+  };
+
+  return (
+    <article
+      className={`dish-card ${drag.active ? "dragging" : resting ? "resting" : ""}`}
+      onPointerDown={(event: PointerEvent<HTMLElement>) => {
+        // 忽略鼠标右键，避免误触
+        if (event.button !== 0) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setResting(false);
+        setDrag({ active: true, startX: event.clientX, startY: event.clientY, x: 0, y: 0 });
+      }}
+      onPointerMove={(event: PointerEvent<HTMLElement>) => {
+        if (!drag.active) return;
+        setDrag((current) => ({ ...current, x: event.clientX - current.startX, y: event.clientY - current.startY }));
+      }}
+      onPointerUp={finishDrag}
+      onPointerCancel={finishDrag}
+      style={style}
+    >
+      <img className="dish-card-image" src={dish.imageUrl} alt={dish.name} loading="lazy" draggable={false} />
+      {label ? <div className={`swipe-stamp ${labelClass}`}>{label}</div> : null}
+      <div className="dish-card-content">
+        <div className="dish-tags">
+          {dish.tags.map((tag) => (
+            <span key={tag}>{tag}</span>
+          ))}
+        </div>
+        <h2>{dish.name}</h2>
+        <p>{dish.description}</p>
+        <div className="dish-meta">
+          <span>{dish.cookTimeMinutes} 分钟</span>
+          <span>{difficultyLabel(dish.difficulty)}</span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/**
+ * 菜谱卡片：支持左右滑动手势切换上一道 / 下一道。
+ * 横向滑动超过阈值即切换，未达阈值回弹。
+ */
+function RecipeCard({
+  dish,
+  index,
+  total,
+  onPrev,
+  onNext,
+}: {
+  dish: Dish;
+  index: number;
+  total: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const [drag, setDrag] = useState({ active: false, startX: 0, x: 0 });
+  const [resting, setResting] = useState(true);
+
+  const finishDrag = () => {
+    if (!drag.active) return;
+    const delta = drag.x;
+    setResting(true);
+    setDrag({ active: false, startX: 0, x: 0 });
+    if (delta < -SWIPE_THRESHOLD) {
+      onNext();
+    } else if (delta > SWIPE_THRESHOLD) {
+      onPrev();
+    }
+  };
+
+  const dragHint =
+    drag.active && Math.abs(drag.x) > STAMP_THRESHOLD
+      ? drag.x < 0
+        ? "下一道 →"
+        : "← 上一道"
+      : "";
+
+  return (
+    <article
+      className={`recipe-card ${drag.active ? "dragging" : resting ? "resting" : ""}`}
+      onPointerDown={(event: PointerEvent<HTMLElement>) => {
+        if (event.button !== 0) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setResting(false);
+        setDrag({ active: true, startX: event.clientX, x: 0 });
+      }}
+      onPointerMove={(event: PointerEvent<HTMLElement>) => {
+        if (!drag.active) return;
+        setDrag((current) => ({ ...current, x: event.clientX - current.startX }));
+      }}
+      onPointerUp={finishDrag}
+      onPointerCancel={finishDrag}
+    >
+      <img src={dish.imageUrl} alt={dish.name} draggable={false} />
+      <div className="recipe-content">
+        <div className="recipe-title-row">
+          <div>
+            <h2>{dish.name}</h2>
+            <p>{dish.description}</p>
+          </div>
+          <div className="recipe-index-chip">{index + 1} / {total}</div>
+        </div>
+        <RecipeSection title="食材处理">
+          <ol>{dish.recipe.ingredientSteps.map((step) => <li key={step}>{step}</li>)}</ol>
+        </RecipeSection>
+        <RecipeSection title="准备步骤">
+          <ol>{dish.recipe.prepSteps.map((step) => <li key={step}>{step}</li>)}</ol>
+        </RecipeSection>
+        <RecipeSection title="烹饪步骤">
+          <ol>{dish.recipe.cookSteps.map((step) => <li key={step}>{step}</li>)}</ol>
+        </RecipeSection>
+        <RecipeSection title="图文 / 视频">
+          <RecipeMediaBlock media={dish.recipe.media} />
+        </RecipeSection>
+        <RecipeSection title="小贴士">
+          <ul>{dish.recipe.tips.map((tip) => <li key={tip}>{tip}</li>)}</ul>
+        </RecipeSection>
+      </div>
+      {dragHint ? <div className={`recipe-swipe-hint ${drag.x < 0 ? "next" : "prev"}`}>{dragHint}</div> : null}
+    </article>
+  );
+}
+
+function RecipeSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3>{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function RecipeMediaBlock({ media }: { media: RecipeMedia[] }) {
+  if (!media.length) {
+    return (
+      <div className="recipe-media-placeholder" role="img" aria-label="图文视频占位">
+        <span>📷 图文 / 视频教学即将上线</span>
+      </div>
+    );
+  }
+  return (
+    <div className="recipe-media-list">
+      {media.map((item, idx) =>
+        item.type === "image" ? (
+          <figure key={idx}>
+            <img src={item.url} alt={item.caption ?? ""} loading="lazy" />
+            {item.caption ? <figcaption>{item.caption}</figcaption> : null}
+          </figure>
+        ) : (
+          <video key={idx} src={item.url} controls preload="metadata">
+            {item.caption ? <p>{item.caption}</p> : null}
+          </video>
+        ),
+      )}
+    </div>
+  );
+}
+
+export function App() {
+  const [state, setState] = usePersistentState();
+  const selectedDishes = useMemo(() => getDishes(state.selectedDishIds), [state.selectedDishIds]);
+  const pendingDishes = useMemo(() => getDishes(state.pendingDishIds), [state.pendingDishIds]);
+  const remainingDishes = dishes.filter(
+    (dish) =>
+      !state.selectedDishIds.includes(dish.id) &&
+      !state.pendingDishIds.includes(dish.id) &&
+      !state.skippedDishIds.includes(dish.id),
+  );
+  const activeDish = remainingDishes[0];
+  const shoppingList = useMemo(
+    () => buildShoppingList(selectedDishes, state.servings, state.checkedMap),
+    [selectedDishes, state.servings, state.checkedMap],
+  );
+
+  // 用 ref 持有最新的 activeDishId，避免键盘事件闭包拿到旧值
+  const activeDishIdRef = useRef<string | undefined>(activeDish?.id);
+  activeDishIdRef.current = activeDish?.id;
+
+  const patch = (partial: Partial<PersistedState>) => setState((current) => ({ ...current, ...partial }));
+  const setStep = (step: AppStep) => patch({ step });
+
+  const applySwipe = (dishId: string, action: SwipeActionKind) => {
+    setState((current) => {
+      const base = {
+        selectedDishIds: remove(current.selectedDishIds, dishId),
+        pendingDishIds: remove(current.pendingDishIds, dishId),
+        skippedDishIds: remove(current.skippedDishIds, dishId),
+      };
+      const nextHistory = [...current.history, { dishId, action, timestamp: Date.now() }];
+      // 历史上限：超出则截断最早的记录
+      const trimmedHistory = nextHistory.length > HISTORY_LIMIT ? nextHistory.slice(nextHistory.length - HISTORY_LIMIT) : nextHistory;
+      return {
+        ...current,
+        ...base,
+        selectedDishIds: action === "like" ? addUnique(base.selectedDishIds, dishId) : base.selectedDishIds,
+        pendingDishIds: action === "pending" ? addUnique(base.pendingDishIds, dishId) : base.pendingDishIds,
+        skippedDishIds: action === "skip" ? addUnique(base.skippedDishIds, dishId) : base.skippedDishIds,
+        history: trimmedHistory,
+      };
+    });
+  };
+
+  const undoLast = () => {
+    setState((current) => {
+      const last = current.history[current.history.length - 1];
+      if (!last) return current;
+      return {
+        ...current,
+        selectedDishIds: last.action === "like" ? remove(current.selectedDishIds, last.dishId) : current.selectedDishIds,
+        pendingDishIds: last.action === "pending" ? remove(current.pendingDishIds, last.dishId) : current.pendingDishIds,
+        skippedDishIds: last.action === "skip" ? remove(current.skippedDishIds, last.dishId) : current.skippedDishIds,
+        history: current.history.slice(0, -1),
+      };
+    });
+  };
+
+  const resetAll = () => {
+    setState(() => initialState);
+  };
+
+  // 桌面端键盘快捷键：← 跳过 / ↑ 待定 / → 想吃 / Ctrl+Z 撤销
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      // 撤销：在任何步骤都可用
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        undoLast();
+        return;
+      }
+      // 方向键只在首页滑动阶段生效，避免和表单输入冲突
+      if (state.step !== "swipe") return;
+      const id = activeDishIdRef.current;
+      if (!id) return;
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        applySwipe(id, "skip");
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        applySwipe(id, "pending");
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        applySwipe(id, "like");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.step, state.history.length]);
+
+  return (
+    <div className="app-shell">
+      <StepNav step={state.step} setStep={setStep} />
+      {state.step === "swipe" ? (
+        <main className="swipe-screen">
+          <section className="hero-copy">
+            <div className="brand-row">
+              <span className="brand-icon">食</span>
+              <span>今天吃什么</span>
+            </div>
+            <h1>滑一下，把晚饭这件小事交给直觉。</h1>
+            <p>右滑想吃，上滑待定，左滑跳过。桌面端也可以直接点按钮，或用方向键操作。</p>
+            <div className="hero-stats">
+              <span>{state.selectedDishIds.length} 道已选</span>
+              <span>{state.pendingDishIds.length} 道待定</span>
+              <span>{remainingDishes.length} 张待看</span>
+            </div>
+            <div className="hero-shortcut-hint" aria-hidden="true">
+              <kbd>←</kbd> 跳过　<kbd>↑</kbd> 待定　<kbd>→</kbd> 想吃　<kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销
+            </div>
+          </section>
+          <section className="deck-panel" aria-label="菜品卡片">
+            <div className="deck-shell">
+              {remainingDishes.slice(1, 3).map((dish, index) => (
+                <div
+                  aria-hidden="true"
+                  className="dish-card ghost"
+                  key={dish.id}
+                  style={{ transform: `translateY(${(index + 1) * 12}px) scale(${1 - (index + 1) * 0.04})` }}
+                >
+                  <img className="dish-card-image" src={dish.imageUrl} alt="" draggable={false} />
+                </div>
+              ))}
+              {activeDish ? (
+                <SwipeDishCard dish={activeDish} onSwipe={(action) => applySwipe(activeDish.id, action)} />
+              ) : (
+                <div className="deck-complete">
+                  <h2>菜品看完啦</h2>
+                  <p>可以进入菜单确认，也可以重置后再来一轮。</p>
+                </div>
+              )}
+            </div>
+            <div className="action-dock">
+              <button className="round-action skip" onClick={() => activeDish && applySwipe(activeDish.id, "skip")} type="button" disabled={!activeDish}>
+                <span>跳过</span>
+              </button>
+              <button className="round-action pending" onClick={() => activeDish && applySwipe(activeDish.id, "pending")} type="button" disabled={!activeDish}>
+                <span>待定</span>
+              </button>
+              <button className="round-action like" onClick={() => activeDish && applySwipe(activeDish.id, "like")} type="button" disabled={!activeDish}>
+                <span>想吃</span>
+              </button>
+            </div>
+            <div className="deck-secondary-actions">
+              <button className="secondary-button" onClick={undoLast} type="button" disabled={!state.history.length}>
+                撤销
+              </button>
+              <button className="secondary-button" onClick={resetAll} type="button">
+                重新开始
+              </button>
+              <button className="primary-button" onClick={() => setStep("selected")} type="button">
+                选好了
+              </button>
+            </div>
+          </section>
+        </main>
+      ) : null}
+
+      {state.step === "selected" ? (
+        <main className="flow-page">
+          <header className="flow-header">
+            <div>
+              <p className="eyebrow">Step 1</p>
+              <h1>已选菜单</h1>
+            </div>
+            <div className="serving-control">
+              <button onClick={() => patch({ servings: Math.max(MIN_SERVINGS, state.servings - 1) })} type="button">-</button>
+              <span>{state.servings} 人份</span>
+              <button onClick={() => patch({ servings: Math.min(MAX_SERVINGS, state.servings + 1) })} type="button">+</button>
+            </div>
+          </header>
+          {selectedDishes.length ? (
+            <div className="dish-list">
+              {selectedDishes.map((dish) => (
+                <article className="list-card" key={dish.id}>
+                  <img src={dish.imageUrl} alt={dish.name} draggable={false} />
+                  <div>
+                    <h3>{dish.name}</h3>
+                    <p>{dish.description}</p>
+                    <span>{dish.cookTimeMinutes} 分钟 · {difficultyLabel(dish.difficulty)}</span>
+                  </div>
+                  <button className="icon-button" onClick={() => patch({ selectedDishIds: remove(state.selectedDishIds, dish.id) })} type="button">
+                    删除
+                  </button>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="还没有选中菜品" description="回到首页继续滑卡片，右滑就能把菜加入菜单。" actionLabel="继续挑选" onAction={() => setStep("swipe")} />
+          )}
+          <div className="flow-actions">
+            <button className="secondary-button" onClick={() => setStep("swipe")} type="button">继续挑选</button>
+            <button className="primary-button" onClick={() => setStep("pending")} type="button">处理待定</button>
+          </div>
+        </main>
+      ) : null}
+
+      {state.step === "pending" ? (
+        <main className="flow-page">
+          <header className="flow-header">
+            <div>
+              <p className="eyebrow">Step 2</p>
+              <h1>待定区域</h1>
+            </div>
+          </header>
+          {pendingDishes.length ? (
+            <div className="pending-grid">
+              {pendingDishes.map((dish) => (
+                <article className="pending-card" key={dish.id}>
+                  <img src={dish.imageUrl} alt={dish.name} draggable={false} />
+                  <div>
+                    <h3>{dish.name}</h3>
+                    <p>{dish.description}</p>
+                  </div>
+                  <div className="pending-actions">
+                    <button className="secondary-button" onClick={() => patch({ pendingDishIds: remove(state.pendingDishIds, dish.id) })} type="button">删除</button>
+                    <button className="primary-button" onClick={() => patch({ pendingDishIds: remove(state.pendingDishIds, dish.id), selectedDishIds: addUnique(state.selectedDishIds, dish.id) })} type="button">加入菜单</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="没有犹豫项" description="你已经很果断了，可以直接生成采购清单。" actionLabel="生成采购清单" onAction={() => setStep("shopping")} />
+          )}
+          <div className="flow-actions">
+            <button className="secondary-button" onClick={() => setStep("selected")} type="button">返回菜单</button>
+            <button className="primary-button" onClick={() => setStep("shopping")} type="button">生成采购清单</button>
+          </div>
+        </main>
+      ) : null}
+
+      {state.step === "shopping" ? (
+        <ShoppingScreen
+          list={shoppingList}
+          setStep={setStep}
+          toggle={(key) => patch({ checkedMap: { ...state.checkedMap, [key]: !state.checkedMap[key] } })}
+        />
+      ) : null}
+
+      {state.step === "recipes" ? (
+        <RecipeScreen dishes={selectedDishes} recipeIndex={state.recipeIndex} patch={patch} setStep={setStep} />
+      ) : null}
+    </div>
+  );
+}
+
+function ShoppingScreen({
+  list,
+  toggle,
+  setStep,
+}: {
+  list: ShoppingListItem[];
+  toggle: (key: string) => void;
+  setStep: (step: AppStep) => void;
+}) {
+  const totalChecked = list.filter((item) => item.checked).length;
+  return (
+    <main className="flow-page">
+      <header className="flow-header">
+        <div>
+          <p className="eyebrow">Step 3</p>
+          <h1>智能采购清单</h1>
+        </div>
+        <div className="summary-chip">{totalChecked}/{list.length}</div>
+      </header>
+      {list.length ? (
+        <div className="shopping-groups">
+          {categoryOrder.map((category) => {
+            const items = list.filter((item) => item.category === category);
+            if (!items.length) return null;
+            return (
+              <section className="shopping-group" key={category}>
+                <h2>{categoryLabels[category]}</h2>
+                <div className="shopping-items">
+                  {items.map((item) => (
+                    <label className={`shopping-item ${item.checked ? "checked" : ""}`} key={item.key}>
+                      <input checked={item.checked} onChange={() => toggle(item.key)} type="checkbox" />
+                      <span>{item.name}</span>
+                      <strong>{formatQuantity(item.quantity)}{item.unit}</strong>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState title="清单暂时为空" description="至少选择一道菜后，系统会自动汇总食材。" actionLabel="返回挑选" onAction={() => setStep("swipe")} />
+      )}
+      <div className="flow-actions">
+        <button className="secondary-button" onClick={() => setStep("pending")} type="button">返回待定</button>
+        <button className="primary-button" onClick={() => setStep("recipes")} type="button">查看菜谱</button>
+      </div>
+    </main>
+  );
+}
+
+function RecipeScreen({
+  dishes: selectedDishes,
+  recipeIndex,
+  patch,
+  setStep,
+}: {
+  dishes: Dish[];
+  recipeIndex: number;
+  patch: (partial: Partial<PersistedState>) => void;
+  setStep: (step: AppStep) => void;
+}) {
+  const safeIndex = Math.min(recipeIndex, Math.max(selectedDishes.length - 1, 0));
+  const dish = selectedDishes[safeIndex];
+  const move = (delta: number) => {
+    if (!selectedDishes.length) return;
+    patch({ recipeIndex: (safeIndex + delta + selectedDishes.length) % selectedDishes.length });
+  };
+
+  return (
+    <main className="flow-page recipe-page">
+      <header className="flow-header">
+        <div>
+          <p className="eyebrow">Step 4</p>
+          <h1>卡片式菜谱教学</h1>
+        </div>
+        {selectedDishes.length ? <div className="summary-chip">{safeIndex + 1}/{selectedDishes.length}</div> : null}
+      </header>
+      {dish ? (
+        <RecipeCard
+          dish={dish}
+          index={safeIndex}
+          total={selectedDishes.length}
+          onPrev={() => move(-1)}
+          onNext={() => move(1)}
+        />
+      ) : (
+        <EmptyState title="还没有可查看的菜谱" description="先选中几道想吃的菜，再回来查看做法。" actionLabel="返回挑选" onAction={() => setStep("swipe")} />
+      )}
+      <div className="flow-actions">
+        <button className="secondary-button" onClick={() => move(-1)} type="button" disabled={selectedDishes.length < 2}>上一道</button>
+        <button className="secondary-button" onClick={() => setStep("shopping")} type="button">返回清单</button>
+        <button className="primary-button" onClick={() => move(1)} type="button" disabled={selectedDishes.length < 2}>下一道</button>
+      </div>
+      {selectedDishes.length >= 2 ? (
+        <p className="recipe-swipe-tip" aria-hidden="true">提示：在卡片上左右滑动可快速切换菜品</p>
+      ) : null}
+    </main>
+  );
+}
