@@ -80,7 +80,7 @@ export type Recipe = {
   tips: string[];
 };
 
-export type AppStep = "swipe" | "selected" | "pending" | "shopping" | "recipes";
+export type AppStep = "swipe" | "menu" | "shopping" | "recipes";
 
 /** 滑动动作类型，集中维护以便键盘快捷键与按钮共用 */
 export type SwipeActionKind = "like" | "pending" | "skip";

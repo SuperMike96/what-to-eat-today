@@ -31,7 +31,7 @@ export const dishes: Dish[] = [
   {
     id: "tomato-egg",
     name: "番茄炒蛋",
-    imageUrl: img("photo-1562967916-eb82221dfb36"),
+    imageUrl: img("photo-1625943553852-781c6dd46faa"),
     tags: ["快手", "家常", "酸甜"],
     cookTimeMinutes: 15,
     difficulty: "easy",
@@ -171,7 +171,7 @@ export const dishes: Dish[] = [
   {
     id: "beef-rice",
     name: "肥牛饭",
-    imageUrl: img("photo-1504674900247-0877df9cc836"),
+    imageUrl: img("photo-1603073163308-9654c3fb70b5"),
     tags: ["一人食", "主食", "快手"],
     cookTimeMinutes: 20,
     difficulty: "easy",
@@ -241,7 +241,7 @@ export const dishes: Dish[] = [
   {
     id: "scallion-noodles",
     name: "葱油拌面",
-    imageUrl: img("photo-1612929633738-8fe44f7ec841"),
+    imageUrl: img("photo-1569718212165-3a8278d5f624"),
     tags: ["主食", "快手", "香"],
     cookTimeMinutes: 18,
     difficulty: "easy",
@@ -264,7 +264,7 @@ export const dishes: Dish[] = [
   {
     id: "three-cup-chicken",
     name: "三杯鸡",
-    imageUrl: img("photo-1534939561126-855b8675edd7"),
+    imageUrl: img("photo-1598103442097-8b74394b95c6"),
     tags: ["台式", "浓香", "下饭"],
     cookTimeMinutes: 40,
     difficulty: "medium",
@@ -381,7 +381,7 @@ export const dishes: Dish[] = [
   {
     id: "curry-chicken",
     name: "咖喱鸡饭",
-    imageUrl: img("photo-1601050690597-df0568f70950"),
+    imageUrl: img("photo-1565557623262-b51c2513a641"),
     tags: ["主食", "浓郁", "一锅"],
     cookTimeMinutes: 35,
     difficulty: "easy",
@@ -450,7 +450,7 @@ export const dishes: Dish[] = [
   {
     id: "pepper-pork",
     name: "青椒肉丝",
-    imageUrl: img("photo-1525755662778-989d0524087e"),
+    imageUrl: img("photo-1546069901-ba9599a7e63c"),
     tags: ["快手", "下饭", "家常"],
     cookTimeMinutes: 20,
     difficulty: "easy",
