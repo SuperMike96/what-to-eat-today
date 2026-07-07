@@ -68,14 +68,17 @@ function saveState(state: PersistedState) {
 }
 
 function usePersistentState() {
-  const [state, setInnerState] = useState<PersistedState>(() => loadState());
-  const setState = (updater: (state: PersistedState) => PersistedState) => {
-    setInnerState((current) => {
-      const next = updater(current);
-      saveState(next);
-      return next;
-    });
-  };
+  const [state, setState] = useState<PersistedState>(() => loadState());
+
+  // Persist as a side effect of state changes (debounced). This keeps the
+  // updater pure — writing to localStorage inside a setState updater is an
+  // anti-pattern that breaks under React StrictMode double-invocation and
+  // blocks the main thread on every keystroke/swipe.
+  useEffect(() => {
+    const timer = setTimeout(() => saveState(state), 150);
+    return () => clearTimeout(timer);
+  }, [state]);
+
   return [state, setState] as const;
 }
 
@@ -355,7 +358,12 @@ export function App() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      // Ignore OS key auto-repeat so a held arrow key doesn't fire dozens of swipes.
+      if (event.repeat) return;
+      // Undo is only meaningful while swiping; limit its scope so Ctrl+Z on the
+      // menu/shopping/recipes tabs doesn't silently remove a dish selection.
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+        if (state.step !== "swipe") return;
         event.preventDefault();
         undoLast();
         return;
