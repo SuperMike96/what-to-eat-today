@@ -20,7 +20,8 @@ const initialState: PersistedState = {
   recipeIndex: 0,
 };
 
-const storageKey = "what-to-eat-web-mvp";
+const storageKey = "what-to-eat-web-mvp-v1";
+const STEP_VALUES: AppStep[] = ["swipe", "menu", "shopping", "recipes"];
 
 const SWIPE_THRESHOLD = 110;
 const STAMP_THRESHOLD = 44;
@@ -28,10 +29,35 @@ const HISTORY_LIMIT = 50;
 const MIN_SERVINGS = 1;
 const MAX_SERVINGS = 12;
 
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((v) => typeof v === "string");
+
 function loadState(): PersistedState {
   try {
     const raw = localStorage.getItem(storageKey);
-    return raw ? { ...initialState, ...JSON.parse(raw) } : initialState;
+    if (!raw) return initialState;
+    const parsed = JSON.parse(raw) as Partial<PersistedState>;
+    return {
+      step: STEP_VALUES.includes(parsed.step as AppStep) ? (parsed.step as AppStep) : initialState.step,
+      selectedDishIds: isStringArray(parsed.selectedDishIds) ? parsed.selectedDishIds : [],
+      pendingDishIds: isStringArray(parsed.pendingDishIds) ? parsed.pendingDishIds : [],
+      skippedDishIds: isStringArray(parsed.skippedDishIds) ? parsed.skippedDishIds : [],
+      history: Array.isArray(parsed.history)
+        ? parsed.history
+            .filter(
+              (h): h is SwipeAction =>
+                !!h && typeof h.dishId === "string" && (["like", "pending", "skip"] as const).includes(h.action),
+            )
+            .slice(-HISTORY_LIMIT)
+        : [],
+      servings:
+        typeof parsed.servings === "number" && parsed.servings >= MIN_SERVINGS && parsed.servings <= MAX_SERVINGS
+          ? Math.round(parsed.servings)
+          : initialState.servings,
+      checkedMap:
+        parsed.checkedMap && typeof parsed.checkedMap === "object" ? (parsed.checkedMap as Record<string, boolean>) : {},
+      recipeIndex: typeof parsed.recipeIndex === "number" && parsed.recipeIndex >= 0 ? Math.floor(parsed.recipeIndex) : 0,
+    };
   } catch {
     return initialState;
   }
