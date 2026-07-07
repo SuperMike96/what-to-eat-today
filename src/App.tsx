@@ -108,10 +108,8 @@ function getDishes(ids: string[]) {
 const difficultyLabel = (level: Dish["difficulty"]) =>
   level === "easy" ? "简单" : level === "medium" ? "适中" : "进阶";
 
-type TabKey = "swipe" | "menu" | "shopping" | "recipes";
-
-function TabBar({ active, onChange, badge }: { active: TabKey; onChange: (tab: TabKey) => void; badge: number }) {
-  const tabs: Array<{ key: TabKey; icon: string; label: string }> = [
+function TabBar({ active, onChange, badge }: { active: AppStep; onChange: (tab: AppStep) => void; badge: number }) {
+  const tabs: Array<{ key: AppStep; icon: string; label: string }> = [
     { key: "swipe", icon: "🍳", label: "挑选" },
     { key: "menu", icon: "📋", label: "菜单" },
     { key: "shopping", icon: "🛒", label: "清单" },
