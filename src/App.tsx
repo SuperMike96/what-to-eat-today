@@ -85,6 +85,22 @@ function usePersistentState() {
 const remove = (items: string[], item: string) => items.filter((id) => id !== item);
 const addUnique = (items: string[], item: string) => (items.includes(item) ? items : [...items, item]);
 
+type DishLists = Pick<PersistedState, "selectedDishIds" | "pendingDishIds" | "skippedDishIds">;
+
+// Single source of truth for moving a dish between the selected / pending / skipped
+// lists. `action === null` removes the dish from every list (used by undo).
+function updateListsByAction(lists: DishLists, dishId: string, action: SwipeActionKind | null): DishLists {
+  const next: DishLists = {
+    selectedDishIds: remove(lists.selectedDishIds, dishId),
+    pendingDishIds: remove(lists.pendingDishIds, dishId),
+    skippedDishIds: remove(lists.skippedDishIds, dishId),
+  };
+  if (action === "like") next.selectedDishIds = addUnique(next.selectedDishIds, dishId);
+  else if (action === "pending") next.pendingDishIds = addUnique(next.pendingDishIds, dishId);
+  else if (action === "skip") next.skippedDishIds = addUnique(next.skippedDishIds, dishId);
+  return next;
+}
+
 function getDishes(ids: string[]) {
   return ids.map((id) => dishes.find((dish) => dish.id === id)).filter((dish): dish is Dish => Boolean(dish));
 }
