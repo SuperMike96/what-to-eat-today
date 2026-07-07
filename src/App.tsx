@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { AppStep, SwipeActionKind } from "./types";
 import { dishes } from "./data/dishes";
 import {
@@ -11,6 +11,7 @@ import {
 } from "./hooks/usePersistentState";
 import { addUnique, difficultyLabel, getDishes, remove, updateListsByAction } from "./lib/dishActions";
 import { buildShoppingList } from "./utils/shopping";
+import { haptic } from "./lib/haptics";
 import { TabBar } from "./components/TabBar";
 import { CompactHeader } from "./components/CompactHeader";
 import { SwipeDishCard } from "./components/SwipeDishCard";
@@ -73,6 +74,16 @@ export function App() {
   };
 
   const resetAll = () => setState(() => structuredClone(initialState));
+
+  // Live "preview" of which action a hovered/pressed dock button implies, so
+  // the card can reflect it (Tinder-style visual feedback).
+  const [preview, setPreview] = useState<SwipeActionKind | null>(null);
+  const sweep = (action: SwipeActionKind) => {
+    if (!activeDish) return;
+    setPreview(null);
+    haptic(action === "like" ? [10, 30, 10] : action === "skip" ? 18 : 14);
+    applySwipe(activeDish.id, action);
+  };
 
   // Prune checkedMap so it never accumulates stale keys for dishes removed from
   // the menu (R7).
@@ -141,22 +152,62 @@ export function App() {
                 </div>
               ))}
               {activeDish ? (
-                <SwipeDishCard dish={activeDish} onSwipe={(action) => applySwipe(activeDish.id, action)} />
+                <SwipeDishCard
+                  key={activeDish.id}
+                  dish={activeDish}
+                  preview={preview}
+                  onSwipe={(action) => applySwipe(activeDish.id, action)}
+                />
               ) : (
                 <div className="deck-complete">
-                  <h2>菜品看完啦</h2>
-                  <p>可以进入菜单确认，也可以重置后再来一轮。</p>
+                  <div className="deck-complete-emoji" aria-hidden="true">🎉</div>
+                  <h2>今日菜单已生成</h2>
+                  <p>
+                    右滑的 {state.selectedDishIds.length} 道菜已进入菜单，待定 {state.pendingDishIds.length} 道。
+                  </p>
+                  <div className="deck-complete-actions">
+                    <button className="primary-button" type="button" onClick={() => setStep("menu")}>
+                      查看菜单
+                    </button>
+                    <button className="secondary-button" type="button" onClick={resetAll}>
+                      再滑一轮
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
             <div className="action-dock">
-              <button className="round-action skip" onClick={() => activeDish && applySwipe(activeDish.id, "skip")} type="button" disabled={!activeDish}>
+              <button
+                className="round-action skip"
+                type="button"
+                disabled={!activeDish}
+                onMouseEnter={() => setPreview("skip")}
+                onMouseLeave={() => setPreview(null)}
+                onPointerDown={() => setPreview(null)}
+                onClick={() => sweep("skip")}
+              >
                 <span>跳过</span>
               </button>
-              <button className="round-action pending" onClick={() => activeDish && applySwipe(activeDish.id, "pending")} type="button" disabled={!activeDish}>
+              <button
+                className="round-action pending"
+                type="button"
+                disabled={!activeDish}
+                onMouseEnter={() => setPreview("pending")}
+                onMouseLeave={() => setPreview(null)}
+                onPointerDown={() => setPreview(null)}
+                onClick={() => sweep("pending")}
+              >
                 <span>待定</span>
               </button>
-              <button className="round-action like" onClick={() => activeDish && applySwipe(activeDish.id, "like")} type="button" disabled={!activeDish}>
+              <button
+                className="round-action like"
+                type="button"
+                disabled={!activeDish}
+                onMouseEnter={() => setPreview("like")}
+                onMouseLeave={() => setPreview(null)}
+                onPointerDown={() => setPreview(null)}
+                onClick={() => sweep("like")}
+              >
                 <span>想吃</span>
               </button>
             </div>

@@ -20,9 +20,13 @@ export interface DragGesture {
  * Shared pointer-drag helper used by the swipe and recipe cards so the
  * boilerplate (pointer capture, delta tracking, cancel handling) lives in one
  * place. `onEnd` receives the final {x, y} delta; callers decide there whether
- * a swipe threshold was crossed.
+ * a swipe threshold was crossed. `onMove` (optional) fires on every pointer
+ * move with the live delta — used for progress visuals and mid-drag haptics.
  */
-export function useDragGesture(onEnd: (delta: { x: number; y: number }) => void): DragGesture {
+export function useDragGesture(
+  onEnd: (delta: { x: number; y: number }) => void,
+  onMove?: (delta: { x: number; y: number }) => void,
+): DragGesture {
   const [drag, setDrag] = useState<DragState>({ active: false, startX: 0, startY: 0, x: 0, y: 0 });
   const dragRef = useRef(drag);
   // Mirror drag into a ref so event handlers read the latest value without
@@ -39,7 +43,10 @@ export function useDragGesture(onEnd: (delta: { x: number; y: number }) => void)
 
   const onPointerMove = (event: PointerEvent<HTMLElement>) => {
     if (!dragRef.current.active) return;
-    setDrag((current) => ({ ...current, x: event.clientX - current.startX, y: event.clientY - current.startY }));
+    const base = dragRef.current;
+    const next = { ...base, x: event.clientX - base.startX, y: event.clientY - base.startY };
+    setDrag(next);
+    onMove?.({ x: next.x, y: next.y });
   };
 
   const onPointerUp = () => {
