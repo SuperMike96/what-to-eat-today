@@ -333,6 +333,19 @@ export function App() {
     [selectedDishes, state.servings, state.checkedMap],
   );
 
+  // Prune checkedMap so it never accumulates stale keys for dishes removed from
+  // the menu (R7). Otherwise it grows unbounded and keeps checkbox state for
+  // items no longer present in the shopping list.
+  useEffect(() => {
+    const validKeys = new Set(shoppingList.map((item) => item.key));
+    const hasStale = Object.keys(state.checkedMap).some((key) => !validKeys.has(key));
+    if (!hasStale) return;
+    setState((current) => ({
+      ...current,
+      checkedMap: Object.fromEntries(Object.entries(current.checkedMap).filter(([key]) => validKeys.has(key))),
+    }));
+  }, [shoppingList, state.checkedMap, setState]);
+
   const activeDishIdRef = useRef<string | undefined>(activeDish?.id);
   activeDishIdRef.current = activeDish?.id;
 
@@ -342,21 +355,10 @@ export function App() {
 
   const applySwipe = (dishId: string, action: SwipeActionKind) => {
     setState((current) => {
-      const base = {
-        selectedDishIds: remove(current.selectedDishIds, dishId),
-        pendingDishIds: remove(current.pendingDishIds, dishId),
-        skippedDishIds: remove(current.skippedDishIds, dishId),
-      };
+      const lists = updateListsByAction(current, dishId, action);
       const nextHistory = [...current.history, { dishId, action, timestamp: Date.now() }];
-      const trimmedHistory = nextHistory.length > HISTORY_LIMIT ? nextHistory.slice(nextHistory.length - HISTORY_LIMIT) : nextHistory;
-      return {
-        ...current,
-        ...base,
-        selectedDishIds: action === "like" ? addUnique(base.selectedDishIds, dishId) : base.selectedDishIds,
-        pendingDishIds: action === "pending" ? addUnique(base.pendingDishIds, dishId) : base.pendingDishIds,
-        skippedDishIds: action === "skip" ? addUnique(base.skippedDishIds, dishId) : base.skippedDishIds,
-        history: trimmedHistory,
-      };
+      const trimmedHistory = nextHistory.length > HISTORY_LIMIT ? nextHistory.slice(-HISTORY_LIMIT) : nextHistory;
+      return { ...current, ...lists, history: trimmedHistory };
     });
   };
 
@@ -364,13 +366,8 @@ export function App() {
     setState((current) => {
       const last = current.history[current.history.length - 1];
       if (!last) return current;
-      return {
-        ...current,
-        selectedDishIds: last.action === "like" ? remove(current.selectedDishIds, last.dishId) : current.selectedDishIds,
-        pendingDishIds: last.action === "pending" ? remove(current.pendingDishIds, last.dishId) : current.pendingDishIds,
-        skippedDishIds: last.action === "skip" ? remove(current.skippedDishIds, last.dishId) : current.skippedDishIds,
-        history: current.history.slice(0, -1),
-      };
+      const lists = updateListsByAction(current, last.dishId, null);
+      return { ...current, ...lists, history: current.history.slice(0, -1) };
     });
   };
 
