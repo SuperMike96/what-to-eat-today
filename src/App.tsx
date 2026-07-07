@@ -301,11 +301,15 @@ export function App() {
   const [state, setState] = usePersistentState();
   const selectedDishes = useMemo(() => getDishes(state.selectedDishIds), [state.selectedDishIds]);
   const pendingDishes = useMemo(() => getDishes(state.pendingDishIds), [state.pendingDishIds]);
-  const remainingDishes = dishes.filter(
-    (dish) =>
-      !state.selectedDishIds.includes(dish.id) &&
-      !state.pendingDishIds.includes(dish.id) &&
-      !state.skippedDishIds.includes(dish.id),
+  const remainingDishes = useMemo(
+    () =>
+      dishes.filter(
+        (dish) =>
+          !state.selectedDishIds.includes(dish.id) &&
+          !state.pendingDishIds.includes(dish.id) &&
+          !state.skippedDishIds.includes(dish.id),
+      ),
+    [state.selectedDishIds, state.pendingDishIds, state.skippedDishIds],
   );
   const activeDish = remainingDishes[0];
   const shoppingList = useMemo(
