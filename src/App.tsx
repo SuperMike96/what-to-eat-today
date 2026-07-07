@@ -349,7 +349,7 @@ export function App() {
 
   const patch = (partial: Partial<PersistedState>) => setState((current) => ({ ...current, ...partial }));
   const setStep = (step: AppStep) => patch({ step });
-  const setTab = (tab: TabKey) => setStep(tab);
+  const setTab = (tab: AppStep) => setStep(tab);
 
   const applySwipe = (dishId: string, action: SwipeActionKind) => {
     setState((current) => {
