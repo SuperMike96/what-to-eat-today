@@ -358,7 +358,7 @@ export function App() {
     });
   };
 
-  const resetAll = () => setState(() => initialState);
+  const resetAll = () => setState(() => structuredClone(initialState));
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
