@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import type { AppStep, SwipeActionKind } from "./types";
 import { dishes } from "./data/dishes";
 import {
@@ -45,7 +45,10 @@ export function App() {
   );
 
   const activeDishIdRef = useRef<string | undefined>(activeDish?.id);
-  activeDishIdRef.current = activeDish?.id;
+  // Keep the ref in sync via an effect (not during render) per react-hooks/refs.
+  useEffect(() => {
+    activeDishIdRef.current = activeDish?.id;
+  }, [activeDish]);
 
   const patch = (partial: Partial<PersistedState>) => setState((current) => ({ ...current, ...partial }));
   const setStep = (step: AppStep) => patch({ step });

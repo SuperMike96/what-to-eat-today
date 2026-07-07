@@ -1,4 +1,4 @@
-import { PointerEvent, useRef, useState } from "react";
+import { PointerEvent, useEffect, useRef, useState } from "react";
 
 export interface DragState {
   active: boolean;
@@ -25,7 +25,11 @@ export interface DragGesture {
 export function useDragGesture(onEnd: (delta: { x: number; y: number }) => void): DragGesture {
   const [drag, setDrag] = useState<DragState>({ active: false, startX: 0, startY: 0, x: 0, y: 0 });
   const dragRef = useRef(drag);
-  dragRef.current = drag;
+  // Mirror drag into a ref so event handlers read the latest value without
+  // re-binding. Updated in an effect (not during render) per react-hooks/refs.
+  useEffect(() => {
+    dragRef.current = drag;
+  });
 
   const onPointerDown = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0) return;
@@ -38,7 +42,7 @@ export function useDragGesture(onEnd: (delta: { x: number; y: number }) => void)
     setDrag((current) => ({ ...current, x: event.clientX - current.startX, y: event.clientY - current.startY }));
   };
 
-  const onPointerUp = (event: PointerEvent<HTMLElement>) => {
+  const onPointerUp = () => {
     if (!dragRef.current.active) return;
     const { x, y } = dragRef.current;
     setDrag({ active: false, startX: 0, startY: 0, x: 0, y: 0 });
