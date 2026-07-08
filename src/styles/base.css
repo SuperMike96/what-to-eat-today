@@ -161,7 +161,7 @@ button:disabled {
 }
 
 .dish-card-detail h3 {
-  font-size: 16px;
+  font-size: clamp(14px, 1.8vw, 17px);
   margin: 12px 0 6px;
   color: rgba(255, 255, 255, 0.9);
 }
@@ -177,7 +177,7 @@ button:disabled {
 }
 
 .dish-card-detail li {
-  font-size: 14px;
+  font-size: clamp(13px, 1.5vw, 15px);
   line-height: 1.8;
   color: rgba(255, 255, 255, 0.78);
 }
@@ -185,13 +185,13 @@ button:disabled {
 .detail-tap-hint {
   margin-top: auto;
   text-align: center;
-  font-size: 12px;
+  font-size: clamp(11px, 1.2vw, 14px);
   color: rgba(255, 255, 255, 0.45);
   padding-top: 12px;
 }
 
 .tap-hint {
-  font-size: 12px;
+  font-size: var(--hint-text);
   color: rgba(255, 255, 255, 0.5);
   margin-top: 10px;
   text-align: center;
