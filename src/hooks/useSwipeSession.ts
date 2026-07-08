@@ -1,46 +1,36 @@
 import { useEffect, useRef, useState } from "react";
-import type { Dish, SwipeActionKind } from "../types";
-import type { PersistedState } from "./usePersistentState";
-import { HISTORY_LIMIT } from "./usePersistentState";
+import type { SwipeActionKind } from "../types";
+import {
+  HISTORY_LIMIT,
+  type PersistedState,
+} from "./usePersistentState";
 import { updateListsByAction } from "../lib/dishActions";
 import { haptic } from "../lib/haptics";
 
-/**
- * Encapsulates all swipe-session logic (preview, keyboard shortcuts,
- * undo, reset, sweep) so App.tsx stays focused on layout and routing.
- */
-export function useSwipeSession(
-  state: PersistedState,
-  setState: (updater: (current: PersistedState) => PersistedState) => void,
-  remainingDishes: Dish[],
-  activeDish: Dish | undefined,
-) {
-  const activeDishIdRef = useRef<string | undefined>(activeDish?.id);
+interface UseSwipeSessionParams {
+  state: PersistedState;
+  setState: (updater: (current: PersistedState) => PersistedState) => void;
+  activeDish: import("../types").Dish | undefined;
+}
 
+/**
+ * Extracts the swipe-session concerns from App.tsx:
+ *   - applySwipe / undoLast / sweep
+ *   - preview state (Tinder-style visual feedback on dock hover)
+ *   - intro hint dismissal
+ *   - keyboard shortcuts (arrow keys + Ctrl+Z)
+ *
+ * resetAll and patch stay in App.tsx — they're not swipe-specific.
+ */
+export function useSwipeSession({
+  state,
+  setState,
+  activeDish,
+}: UseSwipeSessionParams) {
+  const activeDishIdRef = useRef<string | undefined>(activeDish?.id);
   useEffect(() => {
     activeDishIdRef.current = activeDish?.id;
   }, [activeDish]);
-
-  // Live preview of hovered dock button action on the card.
-  const [preview, setPreview] = useState<SwipeActionKind | null>(null);
-
-  // Intro hint: only shown on the very first card of the session.
-  const [introDismissed, setIntroDismissed] = useState<boolean>(() => {
-    try {
-      return window.sessionStorage.getItem("what-to-eat-intro-shown") === "1";
-    } catch {
-      return false;
-    }
-  });
-
-  const dismissIntro = () => {
-    setIntroDismissed(true);
-    try {
-      window.sessionStorage.setItem("what-to-eat-intro-shown", "1");
-    } catch {
-      /* ignore */
-    }
-  };
 
   const applySwipe = (dishId: string, action: SwipeActionKind) => {
     setState((current) => {
@@ -60,11 +50,25 @@ export function useSwipeSession(
     });
   };
 
+  // Live "preview" of which action a hovered/pressed dock button implies.
+  const [preview, setPreview] = useState<SwipeActionKind | null>(null);
+
   const sweep = (action: SwipeActionKind) => {
     if (!activeDish) return;
     setPreview(null);
     haptic(action === "like" ? [10, 30, 10] : action === "skip" ? 18 : 14);
     applySwipe(activeDish.id, action);
+  };
+
+  // Intro hint: shown only on the very first card, then permanently dismissed.
+  const [introDismissed, setIntroDismissed] = useState<boolean>(() => {
+    try { return window.sessionStorage.getItem("what-to-eat-intro-shown") === "1"; }
+    catch { return false; }
+  });
+  const dismissIntro = () => {
+    setIntroDismissed(true);
+    try { window.sessionStorage.setItem("what-to-eat-intro-shown", "1"); }
+    catch { /* ignore */ }
   };
 
   // Keyboard shortcuts
@@ -80,39 +84,22 @@ export function useSwipeSession(
       if (state.step !== "swipe") return;
       const id = activeDishIdRef.current;
       if (!id) return;
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        applySwipe(id, "skip");
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        applySwipe(id, "pending");
-      } else if (event.key === "ArrowRight") {
-        event.preventDefault();
-        applySwipe(id, "like");
-      }
+      if (event.key === "ArrowLeft") { event.preventDefault(); applySwipe(id, "skip"); }
+      else if (event.key === "ArrowUp") { event.preventDefault(); applySwipe(id, "pending"); }
+      else if (event.key === "ArrowRight") { event.preventDefault(); applySwipe(id, "like"); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.step, state.history.length]);
 
-  // Progress: fraction of total dishes reviewed
-  const totalDishes = remainingDishes.length + state.selectedDishIds.length + state.pendingDishIds.length + state.skippedDishIds.length;
-  const reviewedCount = totalDishes - remainingDishes.length;
-  const progress = totalDishes > 0 ? reviewedCount / totalDishes : 0;
-
   return {
     preview,
     setPreview,
-    introDismissed,
-    dismissIntro,
+    sweep,
     applySwipe,
     undoLast,
-    sweep,
-    progress,
-    reviewedCount,
-    totalDishes,
+    introDismissed,
+    dismissIntro,
   };
 }
-
-export type SwipeSession = ReturnType<typeof useSwipeSession>;

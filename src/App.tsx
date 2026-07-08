@@ -1,17 +1,16 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import type { AppStep, SwipeActionKind } from "./types";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import type { AppStep } from "./types";
 import { dishes } from "./data/dishes";
 import {
-  HISTORY_LIMIT,
   MAX_SERVINGS,
   MIN_SERVINGS,
   initialState,
   usePersistentState,
   type PersistedState,
 } from "./hooks/usePersistentState";
-import { addUnique, difficultyLabel, getDishes, remove, updateListsByAction } from "./lib/dishActions";
-import { buildShoppingList } from "./utils/shopping";
-import { haptic } from "./lib/haptics";
+import { useSwipeSession } from "./hooks/useSwipeSession";
+import { addUnique, difficultyLabel, getDishes, remove } from "./lib/dishActions";
+import { buildShoppingList, categoryLabels, categoryOrder, formatQuantity } from "./utils/shopping";
 import { TabBar } from "./components/TabBar";
 import { CompactHeader } from "./components/CompactHeader";
 import { SwipeDishCard } from "./components/SwipeDishCard";
@@ -28,6 +27,7 @@ export function App() {
   const [state, setState] = usePersistentState();
   const selectedDishes = useMemo(() => getDishes(state.selectedDishIds), [state.selectedDishIds]);
   const pendingDishes = useMemo(() => getDishes(state.pendingDishIds), [state.pendingDishIds]);
+  const skippedDishes = useMemo(() => getDishes(state.skippedDishIds), [state.skippedDishIds]);
   const remainingDishes = useMemo(
     () =>
       dishes.filter(
@@ -44,48 +44,64 @@ export function App() {
     [selectedDishes, state.servings, state.checkedMap],
   );
 
-  const activeDishIdRef = useRef<string | undefined>(activeDish?.id);
-  // Keep the ref in sync via an effect (not during render) per react-hooks/refs.
-  useEffect(() => {
-    activeDishIdRef.current = activeDish?.id;
-  }, [activeDish]);
+  // Swipe session: applySwipe, undoLast, sweep, preview, intro, keyboard shortcuts
+  const session = useSwipeSession({ state, setState, activeDish });
 
   const patch = (partial: Partial<PersistedState>) => setState((current) => ({ ...current, ...partial }));
   const setStep = (step: AppStep) => patch({ step });
   const setTab = (tab: AppStep) => setStep(tab);
 
-  const applySwipe = (dishId: string, action: SwipeActionKind) => {
-    setState((current) => {
-      const lists = updateListsByAction(current, dishId, action);
-      const nextHistory = [...current.history, { dishId, action, timestamp: Date.now() }];
-      const trimmedHistory = nextHistory.length > HISTORY_LIMIT ? nextHistory.slice(-HISTORY_LIMIT) : nextHistory;
-      return { ...current, ...lists, history: trimmedHistory };
-    });
-  };
-
-  const undoLast = () => {
-    setState((current) => {
-      const last = current.history[current.history.length - 1];
-      if (!last) return current;
-      const lists = updateListsByAction(current, last.dishId, null);
-      return { ...current, ...lists, history: current.history.slice(0, -1) };
-    });
-  };
-
   const resetAll = () => setState(() => structuredClone(initialState));
 
-  // Live "preview" of which action a hovered/pressed dock button implies, so
-  // the card can reflect it (Tinder-style visual feedback).
-  const [preview, setPreview] = useState<SwipeActionKind | null>(null);
-  const sweep = (action: SwipeActionKind) => {
-    if (!activeDish) return;
-    setPreview(null);
-    haptic(action === "like" ? [10, 30, 10] : action === "skip" ? 18 : 14);
-    applySwipe(activeDish.id, action);
+  // Batch pending actions
+  const addAllPending = () => {
+    patch({
+      selectedDishIds: [...state.selectedDishIds, ...state.pendingDishIds.filter((id) => !state.selectedDishIds.includes(id))],
+      pendingDishIds: [],
+    });
+  };
+  const removeAllPending = () => patch({ pendingDishIds: [] });
+
+  // Restore skipped dish
+  const restoreDish = (dishId: string) => patch({ skippedDishIds: remove(state.skippedDishIds, dishId) });
+
+  // Reorder selected dishes — both menu and recipe tabs follow this order
+  const moveDish = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || to >= state.selectedDishIds.length) return;
+    const newIds = [...state.selectedDishIds];
+    const [moved] = newIds.splice(from, 1);
+    newIds.splice(to, 0, moved);
+    patch({ selectedDishIds: newIds });
   };
 
-  // Prune checkedMap so it never accumulates stale keys for dishes removed from
-  // the menu (R7).
+  // Drag-to-reorder state (HTML5 DnD for desktop)
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Copy shopping list to clipboard
+  const [copied, setCopied] = useState(false);
+  const copyShoppingList = async () => {
+    const lines = categoryOrder
+      .map((cat) => {
+        const items = shoppingList.filter((i) => i.category === cat);
+        if (!items.length) return "";
+        return `${categoryLabels[cat]}\n${items.map((i) => `  ${i.checked ? "[x]" : "[ ]"} ${i.name} ${formatQuantity(i.quantity)}${i.unit}`).join("\n")}`;
+      })
+      .filter(Boolean);
+    const text = `采购清单 (${selectedDishes.length} 道菜, ${state.servings} 人份)\n\n${lines.join("\n\n")}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard not available */
+    }
+  };
+
+  // Skipped section toggle
+  const [showSkipped, setShowSkipped] = useState(false);
+
+  // Prune checkedMap
   useEffect(() => {
     const validKeys = new Set(shoppingList.map((item) => item.key));
     const hasStale = Object.keys(state.checkedMap).some((key) => !validKeys.has(key));
@@ -95,30 +111,6 @@ export function App() {
       checkedMap: Object.fromEntries(Object.entries(current.checkedMap).filter(([key]) => validKeys.has(key))),
     }));
   }, [shoppingList, state.checkedMap, setState]);
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      // Ignore OS key auto-repeat so a held arrow key doesn't fire dozens of swipes (R6).
-      if (event.repeat) return;
-      // Undo is only meaningful while swiping; limit its scope so Ctrl+Z on the
-      // menu/shopping/recipes tabs doesn't silently remove a dish selection (R3).
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
-        if (state.step !== "swipe") return;
-        event.preventDefault();
-        undoLast();
-        return;
-      }
-      if (state.step !== "swipe") return;
-      const id = activeDishIdRef.current;
-      if (!id) return;
-      if (event.key === "ArrowLeft") { event.preventDefault(); applySwipe(id, "skip"); }
-      else if (event.key === "ArrowUp") { event.preventDefault(); applySwipe(id, "pending"); }
-      else if (event.key === "ArrowRight") { event.preventDefault(); applySwipe(id, "like"); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.step, state.history.length]);
 
   const tabBadge = state.selectedDishIds.length + state.pendingDishIds.length;
 
@@ -152,8 +144,11 @@ export function App() {
                 <SwipeDishCard
                   key={activeDish.id}
                   dish={activeDish}
-                  preview={preview}
-                  onSwipe={(action) => applySwipe(activeDish.id, action)}
+                  preview={session.preview}
+                  showIntro={!session.introDismissed && state.history.length === 0}
+                  onIntroDismiss={session.dismissIntro}
+                  onSwipe={(action) => session.applySwipe(activeDish.id, action)}
+                  servings={state.servings}
                 />
               ) : (
                 <div className="deck-complete">
@@ -178,10 +173,10 @@ export function App() {
                 className="round-action skip"
                 type="button"
                 disabled={!activeDish}
-                onMouseEnter={() => setPreview("skip")}
-                onMouseLeave={() => setPreview(null)}
-                onPointerDown={() => setPreview(null)}
-                onClick={() => sweep("skip")}
+                onMouseEnter={() => session.setPreview("skip")}
+                onMouseLeave={() => session.setPreview(null)}
+                onPointerDown={() => session.setPreview(null)}
+                onClick={() => session.sweep("skip")}
               >
                 <span>跳过</span>
               </button>
@@ -189,10 +184,10 @@ export function App() {
                 className="round-action pending"
                 type="button"
                 disabled={!activeDish}
-                onMouseEnter={() => setPreview("pending")}
-                onMouseLeave={() => setPreview(null)}
-                onPointerDown={() => setPreview(null)}
-                onClick={() => sweep("pending")}
+                onMouseEnter={() => session.setPreview("pending")}
+                onMouseLeave={() => session.setPreview(null)}
+                onPointerDown={() => session.setPreview(null)}
+                onClick={() => session.sweep("pending")}
               >
                 <span>待定</span>
               </button>
@@ -200,17 +195,20 @@ export function App() {
                 className="round-action like"
                 type="button"
                 disabled={!activeDish}
-                onMouseEnter={() => setPreview("like")}
-                onMouseLeave={() => setPreview(null)}
-                onPointerDown={() => setPreview(null)}
-                onClick={() => sweep("like")}
+                onMouseEnter={() => session.setPreview("like")}
+                onMouseLeave={() => session.setPreview(null)}
+                onPointerDown={() => session.setPreview(null)}
+                onClick={() => session.sweep("like")}
               >
                 <span>想吃</span>
               </button>
             </div>
             <div className="deck-secondary-actions">
-              <button className="text-button" onClick={undoLast} type="button" disabled={!state.history.length}>撤销</button>
+              <button className="text-button" onClick={session.undoLast} type="button" disabled={!state.history.length}>撤销</button>
               <button className="text-button" onClick={resetAll} type="button">重置</button>
+            </div>
+            <div className="swipe-shortcut-hint" aria-hidden="true">
+              <kbd>←</kbd>跳过 <kbd>↑</kbd>待定 <kbd>→</kbd>想吃 <kbd>Ctrl+Z</kbd>撤销
             </div>
           </section>
         </main>
@@ -231,15 +229,34 @@ export function App() {
           </header>
           {selectedDishes.length ? (
             <div className="dish-list">
-              {selectedDishes.map((dish) => (
-                <article className="list-card" key={dish.id}>
+              {selectedDishes.map((dish, index) => (
+                <article
+                  className={`list-card ${dragIndex === index ? "dragging" : ""} ${dragOverIndex === index && dragIndex !== index ? "drag-over" : ""}`}
+                  key={dish.id}
+                  draggable
+                  onDragStart={() => setDragIndex(index)}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverIndex(index); }}
+                  onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragIndex !== null) moveDish(dragIndex, index);
+                    setDragIndex(null);
+                    setDragOverIndex(null);
+                  }}
+                >
                   <img src={dish.imageUrl} alt={dish.name} draggable={false} />
                   <div>
                     <h3>{dish.name}</h3>
                     <p>{dish.description}</p>
                     <span>{dish.cookTimeMinutes} 分钟 · {difficultyLabel(dish.difficulty)}</span>
                   </div>
-                  <button className="icon-button" onClick={() => patch({ selectedDishIds: remove(state.selectedDishIds, dish.id) })} type="button">删除</button>
+                  <div className="list-card-actions">
+                    <div className="reorder-buttons">
+                      <button className="icon-button small" disabled={index === 0} onClick={() => moveDish(index, index - 1)} type="button" aria-label="上移">↑</button>
+                      <button className="icon-button small" disabled={index === selectedDishes.length - 1} onClick={() => moveDish(index, index + 1)} type="button" aria-label="下移">↓</button>
+                    </div>
+                    <button className="icon-button" onClick={() => patch({ selectedDishIds: remove(state.selectedDishIds, dish.id) })} type="button">删除</button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -250,10 +267,16 @@ export function App() {
             </div>
           )}
 
-          {/* ===== 待定区域（合并进菜单） ===== */}
+          {/* ===== 待定区域 + 批量操作 ===== */}
           {pendingDishes.length > 0 && (
             <section className="pending-section">
-              <h2>待定 ({pendingDishes.length})</h2>
+              <div className="pending-header">
+                <h2>待定 ({pendingDishes.length})</h2>
+                <div className="pending-batch-actions">
+                  <button className="primary-button small" onClick={addAllPending} type="button">全部加入</button>
+                  <button className="text-button" onClick={removeAllPending} type="button">全部移除</button>
+                </div>
+              </div>
               <div className="dish-list">
                 {pendingDishes.map((dish) => (
                   <article className="list-card" key={dish.id}>
@@ -272,6 +295,30 @@ export function App() {
               </div>
             </section>
           )}
+
+          {/* ===== 已跳过区域（可恢复） ===== */}
+          {skippedDishes.length > 0 && (
+            <section className="skipped-section">
+              <button className="skipped-toggle" onClick={() => setShowSkipped(!showSkipped)} type="button">
+                已跳过 ({skippedDishes.length}) {showSkipped ? "▲" : "▼"}
+              </button>
+              {showSkipped && (
+                <div className="dish-list skipped-grid">
+                  {skippedDishes.map((dish) => (
+                    <article className="list-card" key={dish.id}>
+                      <img src={dish.imageUrl} alt={dish.name} draggable={false} />
+                      <div>
+                        <h3>{dish.name}</h3>
+                        <p>{dish.description}</p>
+                        <span>{dish.cookTimeMinutes} 分钟</span>
+                      </div>
+                      <button className="primary-button small" onClick={() => restoreDish(dish.id)} type="button">恢复</button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </main>
       ) : null}
 
@@ -281,6 +328,8 @@ export function App() {
           <ShoppingScreen
             list={shoppingList}
             toggle={(key) => patch({ checkedMap: { ...state.checkedMap, [key]: !state.checkedMap[key] } })}
+            onCopy={copyShoppingList}
+            copied={copied}
           />
         </Suspense>
       ) : null}

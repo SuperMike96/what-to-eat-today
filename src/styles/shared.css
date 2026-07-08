@@ -1,3 +1,5 @@
+/* ===== Shared: Tab Bar, Buttons, Theme Toggle, Responsive, Reduced Motion ===== */
+
 /* ===== Bottom Tab Bar ===== */
 
 .tab-bar {
@@ -124,7 +126,7 @@
   width: 40px;
 }
 
-/* ===== Theme Toggle ===== */
+/* ===== Theme Toggle (R16) ===== */
 
 .theme-toggle {
   position: fixed;
@@ -250,8 +252,9 @@
   }
 }
 
-/* ===== Reduced Motion ===== */
-
+/* ===== Reduced Motion =====
+   Honour users who prefer less motion: kill the looping/decorative animations
+   and make state transitions near-instant while keeping the UI usable. */
 @media (prefers-reduced-motion: reduce) {
   .swipe-hint,
   .swipe-hint .hint-chevron {
@@ -268,6 +271,16 @@
   .round-action,
   .round-action:hover,
   .round-action:active {
+    transition-duration: 0.001ms !important;
+  }
+
+  .flow-page,
+  .list-card,
+  .shopping-item,
+  .shopping-item input,
+  .shopping-item span,
+  .shopping-item strong {
+    animation: none !important;
     transition-duration: 0.001ms !important;
   }
 }

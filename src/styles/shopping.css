@@ -35,16 +35,32 @@
   grid-template-columns: auto 1fr auto;
   min-height: 54px;
   padding: 10px 12px;
+  transition: opacity 200ms ease, background 200ms ease, border-color 200ms ease;
 }
 
 .shopping-item input {
   accent-color: var(--green);
   height: 18px;
   width: 18px;
+  transition: transform 150ms ease;
+}
+
+.shopping-item input:checked {
+  transform: scale(1.25);
 }
 
 .shopping-item strong {
   color: var(--green-dark);
+  transition: color 200ms ease, text-decoration-color 200ms ease;
+}
+
+.shopping-item span {
+  transition: color 200ms ease, text-decoration-color 200ms ease;
+}
+
+.shopping-item.checked {
+  background: rgba(47, 125, 85, 0.06);
+  border-color: rgba(47, 125, 85, 0.2);
 }
 
 .shopping-item.checked span,
