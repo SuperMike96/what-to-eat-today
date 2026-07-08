@@ -148,7 +148,6 @@ export function App() {
                   showIntro={!session.introDismissed && state.history.length === 0}
                   onIntroDismiss={session.dismissIntro}
                   onSwipe={(action) => session.applySwipe(activeDish.id, action)}
-                  servings={state.servings}
                 />
               ) : (
                 <div className="deck-complete">
@@ -167,48 +166,6 @@ export function App() {
                   </div>
                 </div>
               )}
-            </div>
-            <div className="action-dock">
-              <button
-                className="round-action skip"
-                type="button"
-                disabled={!activeDish}
-                onMouseEnter={() => session.setPreview("skip")}
-                onMouseLeave={() => session.setPreview(null)}
-                onPointerDown={() => session.setPreview(null)}
-                onClick={() => session.sweep("skip")}
-              >
-                <span>跳过</span>
-              </button>
-              <button
-                className="round-action pending"
-                type="button"
-                disabled={!activeDish}
-                onMouseEnter={() => session.setPreview("pending")}
-                onMouseLeave={() => session.setPreview(null)}
-                onPointerDown={() => session.setPreview(null)}
-                onClick={() => session.sweep("pending")}
-              >
-                <span>待定</span>
-              </button>
-              <button
-                className="round-action like"
-                type="button"
-                disabled={!activeDish}
-                onMouseEnter={() => session.setPreview("like")}
-                onMouseLeave={() => session.setPreview(null)}
-                onPointerDown={() => session.setPreview(null)}
-                onClick={() => session.sweep("like")}
-              >
-                <span>想吃</span>
-              </button>
-            </div>
-            <div className="deck-secondary-actions">
-              <button className="text-button" onClick={session.undoLast} type="button" disabled={!state.history.length}>撤销</button>
-              <button className="text-button" onClick={resetAll} type="button">重置</button>
-            </div>
-            <div className="swipe-shortcut-hint" aria-hidden="true">
-              <kbd>←</kbd>跳过 <kbd>↑</kbd>待定 <kbd>→</kbd>想吃 <kbd>Ctrl+Z</kbd>撤销
             </div>
           </section>
         </main>

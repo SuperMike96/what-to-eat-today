@@ -4,18 +4,27 @@ import { categoryLabels, categoryOrder, formatQuantity } from "../utils/shopping
 export function ShoppingScreen({
   list,
   toggle,
+  onCopy,
+  copied,
 }: {
   list: ShoppingListItem[];
   toggle: (key: string) => void;
+  onCopy?: () => void;
+  copied?: boolean;
 }) {
-  const totalChecked = list.filter((item) => item.checked).length;
   return (
     <main className="flow-page">
       <header className="flow-header">
         <div>
           <h1>采购清单</h1>
         </div>
-        {list.length > 0 && <div className="summary-chip">{totalChecked}/{list.length}</div>}
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {list.length > 0 && onCopy && (
+            <button className="secondary-button small" onClick={onCopy} type="button">
+              {copied ? "已复制 ✓" : "复制清单"}
+            </button>
+          )}
+        </div>
       </header>
       {list.length ? (
         <div className="shopping-groups">

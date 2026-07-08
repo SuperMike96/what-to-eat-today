@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dish, SwipeActionKind } from "../types";
 import { useDragGesture } from "../hooks/useDragGesture";
 import { SWIPE_THRESHOLD, STAMP_THRESHOLD } from "../lib/constants";
@@ -9,7 +9,7 @@ type Stamp = { kind: SwipeActionKind; opacity: number };
 
 const STAMP_STYLE: Record<SwipeActionKind, { label: string; tint: string }> = {
   like: { label: "想吃", tint: "rgba(69, 212, 131, 0.55)" },
-  skip: { label: "跳过", tint: "rgba(255, 119, 95, 0.55)" },
+  skip: { label: "不吃", tint: "rgba(255, 119, 95, 0.55)" },
   pending: { label: "待定", tint: "rgba(255, 194, 75, 0.55)" },
 };
 
@@ -17,16 +17,21 @@ export function SwipeDishCard({
   dish,
   onSwipe,
   preview = null,
+  showIntro = false,
+  onIntroDismiss,
 }: {
   dish: Dish;
   onSwipe: (action: SwipeActionKind) => void;
   preview?: SwipeActionKind | null;
+  showIntro?: boolean;
+  onIntroDismiss?: () => void;
 }) {
   const [resting, setResting] = useState(true);
-  // When a swipe commits we play a fly-out animation, THEN notify the parent
-  // so the next card mounts (R19).
   const [flying, setFlying] = useState<null | { x: number; y: number; rot: number }>(null);
+  const [showHint, setShowHint] = useState(showIntro);
+  const [expanded, setExpanded] = useState(false);
   const tickedRef = useRef(false);
+  const maxDragRef = useRef(0);
 
   const commit = (action: SwipeActionKind) => {
     const offX = action === "like" ? window.innerWidth : action === "skip" ? -window.innerWidth : 0;
@@ -52,8 +57,7 @@ export function SwipeDishCard({
       commit(action);
     },
     ({ x, y }) => {
-      // A single subtle "tock" the moment the drag passes the reveal
-      // threshold — tactile confirmation that a direction is now locked in.
+      maxDragRef.current = Math.max(maxDragRef.current, Math.abs(x) + Math.abs(y));
       const passed = Math.max(Math.abs(x), Math.abs(y)) > STAMP_THRESHOLD;
       if (passed && !tickedRef.current) {
         tickedRef.current = true;
@@ -69,15 +73,12 @@ export function SwipeDishCard({
   const absX = Math.abs(drag.x);
   const absY = Math.abs(drag.y);
 
-  // Dominant drag direction → stamp kind + progress (0..1). Replaces the old
-  // all-or-nothing reveal so the stamp fades in proportionally to drag depth.
   let stamp: Stamp = { kind: "like", opacity: 0 };
   if (moving) {
     if (absX > absY && drag.x > 0) stamp = { kind: "like", opacity: Math.min(1, drag.x / SWIPE_THRESHOLD) };
     else if (absX > absY && drag.x < 0) stamp = { kind: "skip", opacity: Math.min(1, absX / SWIPE_THRESHOLD) };
-    else if (drag.y < 0) stamp = { kind: "pending", opacity: Math.min(1, absY / STAMP_THRESHOLD) };
+    // Upward swipe still triggers "pending" but no stamp is shown
   } else if (preview) {
-    // Hovering an action button previews its stamp on the card (Tinder-style).
     stamp = { kind: preview, opacity: 0.9 };
   }
 
@@ -88,8 +89,6 @@ export function SwipeDishCard({
   })`;
   const previewShadow = `0 0 0 3px ${tint}, var(--shadow)`;
 
-  // Position the card: follow the finger while dragging, otherwise nudge
-  // slightly toward the previewed action so the button feels connected.
   const px = moving ? drag.x : preview === "like" ? 18 : preview === "skip" ? -18 : 0;
   const py = moving ? drag.y : preview === "pending" ? -16 : 0;
   const prot = moving ? drag.x / 16 : preview === "like" ? 3 : preview === "skip" ? -3 : 0;
@@ -105,16 +104,39 @@ export function SwipeDishCard({
         ...(moving ? { boxShadow: dragShadow } : preview ? { boxShadow: previewShadow } : null),
       };
 
+  const dismissHint = () => {
+    if (showHint) {
+      onIntroDismiss?.();
+      setShowHint(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showHint) return;
+    const timer = window.setTimeout(() => {
+      onIntroDismiss?.();
+      setShowHint(false);
+    }, 5200);
+    return () => window.clearTimeout(timer);
+  }, [showHint, onIntroDismiss]);
+
   return (
     <article
       className={`dish-card${moving ? " dragging" : resting ? " resting" : ""}${flying ? " flying" : ""}`}
       style={style}
       onPointerDown={(event) => {
         setResting(false);
+        dismissHint();
+        maxDragRef.current = 0;
         gesture.onPointerDown(event);
       }}
       onPointerMove={gesture.onPointerMove}
-      onPointerUp={gesture.onPointerUp}
+      onPointerUp={(event) => {
+        if (!flying && maxDragRef.current < 10) {
+          setExpanded((prev) => !prev);
+        }
+        gesture.onPointerUp(event);
+      }}
       onPointerCancel={gesture.onPointerCancel}
     >
       <img
@@ -130,6 +152,42 @@ export function SwipeDishCard({
           {STAMP_STYLE[stamp.kind].label}
         </div>
       )}
+      {showHint && !flying && (
+        <div className="swipe-hint" aria-hidden="true">
+          <span className="hint-chevron left">‹</span>
+          <span className="hint-text">拖动卡片 · 右滑想吃 / 左滑不吃</span>
+          <span className="hint-chevron right">›</span>
+        </div>
+      )}
+
+      {expanded && !flying && (
+        <div className="dish-card-detail">
+          <h3>食材 ({dish.baseServings} 人份)</h3>
+          <ul>
+            {dish.ingredients.map((ing) => (
+              <li key={ing.ingredientId}>{ing.name} {ing.quantity}{ing.unit}</li>
+            ))}
+          </ul>
+          <h3>烹饪步骤</h3>
+          <ol>
+            {dish.recipe.cookSteps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          {dish.recipe.tips.length > 0 && (
+            <>
+              <h3>小贴士</h3>
+              <ul>
+                {dish.recipe.tips.map((tip) => (
+                  <li key={tip}>{tip}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="detail-tap-hint">点击卡片关闭</p>
+        </div>
+      )}
+
       <div className="dish-card-content">
         <div className="dish-tags">
           {dish.tags.map((tag) => (
@@ -140,10 +198,31 @@ export function SwipeDishCard({
         <p>{dish.description}</p>
         <div className="dish-meta">
           <span>{dish.cookTimeMinutes} 分钟</span>
-          <span>
-            {dish.difficulty === "easy" ? "简单" : dish.difficulty === "medium" ? "适中" : "进阶"}
-          </span>
         </div>
+        {!expanded && (
+          <div className="card-actions" aria-label="菜品操作">
+            <button
+              className="round-action skip"
+              type="button"
+              aria-label="不吃"
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
+              onClick={() => commit("skip")}
+            >
+              <span>不吃</span>
+            </button>
+            <button
+              className="round-action like"
+              type="button"
+              aria-label="想吃"
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
+              onClick={() => commit("like")}
+            >
+              <span>想吃</span>
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );

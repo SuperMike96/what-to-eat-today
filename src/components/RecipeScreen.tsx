@@ -24,10 +24,9 @@ export function RecipeScreen({
         <div>
           <h1>菜谱教学</h1>
         </div>
-        {selectedDishes.length ? <div className="summary-chip">{safeIndex + 1}/{selectedDishes.length}</div> : null}
       </header>
       {dish ? (
-        <RecipeCard dish={dish} index={safeIndex} total={selectedDishes.length} onPrev={() => move(-1)} onNext={() => move(1)} />
+        <RecipeCard dish={dish} onPrev={() => move(-1)} onNext={() => move(1)} />
       ) : (
         <div className="empty-state">
           <h3>还没有可查看的菜谱</h3>

@@ -190,9 +190,3 @@ button:disabled {
   padding-top: 12px;
 }
 
-.tap-hint {
-  font-size: var(--hint-text);
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 10px;
-  text-align: center;
-}

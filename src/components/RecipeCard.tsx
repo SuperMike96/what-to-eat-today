@@ -8,14 +8,10 @@ import { RecipeMediaBlock } from "./RecipeMediaBlock";
 
 export function RecipeCard({
   dish,
-  index,
-  total,
   onPrev,
   onNext,
 }: {
   dish: Dish;
-  index: number;
-  total: number;
   onPrev: () => void;
   onNext: () => void;
 }) {
@@ -48,7 +44,6 @@ export function RecipeCard({
             <h2>{dish.name}</h2>
             <p>{dish.description}</p>
           </div>
-          <div className="recipe-index-chip">{index + 1} / {total}</div>
         </div>
         <RecipeSection title="食材处理">
           <ol>{dish.recipe.ingredientSteps.map((step) => <li key={step}>{step}</li>)}</ol>
@@ -59,12 +54,16 @@ export function RecipeCard({
         <RecipeSection title="烹饪步骤">
           <ol>{dish.recipe.cookSteps.map((step) => <li key={step}>{step}</li>)}</ol>
         </RecipeSection>
-        <RecipeSection title="图文 / 视频">
-          <RecipeMediaBlock media={dish.recipe.media} />
-        </RecipeSection>
-        <RecipeSection title="小贴士">
-          <ul>{dish.recipe.tips.map((tip) => <li key={tip}>{tip}</li>)}</ul>
-        </RecipeSection>
+        {dish.recipe.media.length > 0 && (
+          <RecipeSection title="图文 / 视频">
+            <RecipeMediaBlock media={dish.recipe.media} />
+          </RecipeSection>
+        )}
+        {dish.recipe.tips.length > 0 && (
+          <RecipeSection title="小贴士">
+            <ul>{dish.recipe.tips.map((tip) => <li key={tip}>{tip}</li>)}</ul>
+          </RecipeSection>
+        )}
       </div>
       {dragHint ? <div className={`recipe-swipe-hint ${drag.x < 0 ? "next" : "prev"}`}>{dragHint}</div> : null}
     </article>
