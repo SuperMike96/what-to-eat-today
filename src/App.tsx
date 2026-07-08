@@ -122,6 +122,7 @@ export function App() {
           selectedCount={state.selectedDishIds.length}
           pendingCount={state.pendingDishIds.length}
           remainingCount={remainingDishes.length}
+          onReset={resetAll}
         />
       )}
 

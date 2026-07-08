@@ -117,6 +117,30 @@ button:disabled {
   padding: 6px 12px;
 }
 
+.header-reset {
+  align-items: center;
+  background: rgba(242, 99, 75, 0.08);
+  border: 1px solid rgba(242, 99, 75, 0.22);
+  border-radius: 999px;
+  color: var(--coral);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 6px 12px;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.header-reset:hover {
+  background: rgba(242, 99, 75, 0.14);
+  box-shadow: 0 6px 16px rgba(242, 99, 75, 0.16);
+  transform: translateY(-1px);
+}
+
+.header-reset:active {
+  transform: translateY(0) scale(0.96);
+}
+
 /* ===== Brand ===== */
 
 .brand-row {
