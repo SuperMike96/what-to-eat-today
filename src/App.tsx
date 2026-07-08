@@ -15,7 +15,6 @@ import { haptic } from "./lib/haptics";
 import { TabBar } from "./components/TabBar";
 import { CompactHeader } from "./components/CompactHeader";
 import { SwipeDishCard } from "./components/SwipeDishCard";
-import { ThemeToggle } from "./components/ThemeToggle";
 
 // Code-split the two heavier tab screens so the initial bundle stays small (R12).
 const ShoppingScreen = lazy(() =>
@@ -125,8 +124,6 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <ThemeToggle />
-
       {/* ===== 紧凑顶栏 ===== */}
       {state.step === "swipe" && (
         <CompactHeader
@@ -214,9 +211,6 @@ export function App() {
             <div className="deck-secondary-actions">
               <button className="text-button" onClick={undoLast} type="button" disabled={!state.history.length}>撤销</button>
               <button className="text-button" onClick={resetAll} type="button">重置</button>
-            </div>
-            <div className="swipe-shortcut-hint" aria-hidden="true">
-              <kbd>←</kbd>跳过 <kbd>↑</kbd>待定 <kbd>→</kbd>想吃 <kbd>Ctrl+Z</kbd>撤销
             </div>
           </section>
         </main>

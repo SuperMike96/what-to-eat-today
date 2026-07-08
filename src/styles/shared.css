@@ -1,0 +1,273 @@
+/* ===== Bottom Tab Bar ===== */
+
+.tab-bar {
+  align-items: center;
+  background: var(--tab-bg);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  bottom: 0;
+  display: flex;
+  height: var(--tab-height);
+  justify-content: space-around;
+  left: 0;
+  padding: 0 8px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  position: fixed;
+  right: 0;
+  z-index: 10;
+}
+
+.tab-item {
+  align-items: center;
+  background: none;
+  border-radius: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 16px;
+  position: relative;
+  transition: color 180ms ease, background 180ms ease;
+}
+
+.tab-item.active {
+  color: var(--green-dark);
+}
+
+.tab-item:hover {
+  background: rgba(47, 125, 85, 0.06);
+}
+
+.tab-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.tab-label {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tab-badge {
+  align-items: center;
+  background: var(--coral);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  height: 16px;
+  justify-content: center;
+  min-width: 16px;
+  padding: 0 4px;
+  position: absolute;
+  right: 4px;
+  top: 2px;
+}
+
+/* ===== Buttons ===== */
+
+.primary-button,
+.secondary-button,
+.icon-button {
+  align-items: center;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.icon-button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button {
+  background: var(--green);
+  box-shadow: 0 12px 26px rgba(47, 125, 85, 0.24);
+  color: white;
+  font-weight: 800;
+  min-height: 46px;
+  padding: 0 22px;
+}
+
+.primary-button.small {
+  font-size: 13px;
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.secondary-button {
+  background: var(--chip-bg);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 750;
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.secondary-button.small {
+  font-size: 13px;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.icon-button {
+  aspect-ratio: 1;
+  background: #fff2ec;
+  color: var(--coral);
+  flex: 0 0 40px;
+  width: 40px;
+}
+
+/* ===== Theme Toggle ===== */
+
+.theme-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 60;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+.theme-toggle button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.55;
+  transition: opacity 160ms ease, background 160ms ease;
+}
+
+.theme-toggle button.active {
+  opacity: 1;
+  background: rgba(47, 125, 85, 0.16);
+}
+
+.theme-toggle button:hover {
+  opacity: 1;
+}
+
+/* ===== Responsive ===== */
+
+@media (max-width: 860px) {
+  .compact-header {
+    padding: 10px 16px 4px;
+  }
+
+  .swipe-screen-v2 {
+    padding: 4px 14px 14px;
+    min-height: calc(100vh - var(--tab-height) - 48px);
+  }
+
+  .deck-shell {
+    height: 56vh;
+    max-width: 360px;
+    min-height: 400px;
+  }
+
+  .dish-card-content h2 {
+    font-size: 28px;
+  }
+
+  .shopping-items,
+  .recipe-card {
+    grid-template-columns: 1fr;
+  }
+
+  .recipe-card {
+    max-height: none;
+  }
+
+  .recipe-card > img {
+    aspect-ratio: 1.2;
+    min-height: 0;
+  }
+
+  .flow-page {
+    padding: 8px 16px 20px;
+  }
+}
+
+@media (max-width: 560px) {
+  .compact-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .flow-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .list-card {
+    grid-template-columns: 80px 1fr auto;
+  }
+
+  .list-card h3 {
+    font-size: 17px;
+  }
+
+  .dish-card-content {
+    padding: 80px 18px 20px;
+  }
+
+  .dish-card-content h2 {
+    font-size: 26px;
+  }
+
+  .round-action {
+    height: 62px;
+    min-width: 62px;
+  }
+
+  .deck-secondary-actions,
+  .flow-actions {
+    gap: 8px;
+  }
+
+  .flow-actions .primary-button,
+  .flow-actions .secondary-button {
+    flex: 1 1 auto;
+  }
+}
+
+/* ===== Reduced Motion ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  .swipe-hint,
+  .swipe-hint .hint-chevron {
+    animation: none !important;
+  }
+
+  .dish-card:not(.ghost):not(.flying),
+  .dish-card.dragging,
+  .dish-card.resting {
+    animation: none !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .round-action,
+  .round-action:hover,
+  .round-action:active {
+    transition-duration: 0.001ms !important;
+  }
+}

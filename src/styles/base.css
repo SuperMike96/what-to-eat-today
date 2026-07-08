@@ -1,0 +1,150 @@
+/* ===== Theme Tokens ===== */
+
+:root {
+  --bg: #fff8ec;
+  --text: #1f2320;
+  --chip-bg: rgba(255, 255, 255, 0.76);
+  --tab-bg: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  background: var(--bg);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --green: #2f7d55;
+  --green-dark: #245f42;
+  --coral: #f2634b;
+  --amber: #f3a51d;
+  --ink: #1f2320;
+  --muted: #6c716b;
+  --line: rgba(31, 35, 32, 0.12);
+  --surface: #fffdf7;
+  --surface-strong: #ffffff;
+  --shadow: 0 24px 70px rgba(79, 53, 28, 0.18);
+  --tab-height: 64px;
+  --kbd-bg: rgba(255, 255, 255, 0.85);
+  --kbd-border: var(--line);
+}
+
+[data-theme="dark"] {
+  --bg: #14171a;
+  --text: #eef1ee;
+  --muted: #9aa39c;
+  --ink: #eef1ee;
+  --surface: #1d2125;
+  --surface-strong: #23282d;
+  --line: rgba(255, 255, 255, 0.14);
+  --chip-bg: rgba(255, 255, 255, 0.06);
+  --tab-bg: rgba(20, 23, 26, 0.92);
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  --kbd-bg: rgba(255, 255, 255, 0.1);
+  --kbd-border: rgba(255, 255, 255, 0.18);
+}
+
+[data-theme="dark"] .app-shell {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(242, 99, 75, 0.18), transparent 30%),
+    radial-gradient(circle at 78% 4%, rgba(47, 125, 85, 0.18), transparent 28%),
+    linear-gradient(145deg, #14171a 0%, #11151a 52%, #171b20 100%);
+}
+
+/* ===== Reset ===== */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+button, input { font: inherit; }
+
+button { border: 0; }
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* ===== Shell ===== */
+
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(242, 99, 75, 0.14), transparent 28%),
+    radial-gradient(circle at 78% 4%, rgba(47, 125, 85, 0.14), transparent 26%),
+    linear-gradient(145deg, #fff8ec 0%, #f6fbef 52%, #fff5ee 100%);
+  padding: 0 0 var(--tab-height) 0;
+}
+
+/* ===== Compact Header ===== */
+
+.compact-header {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 14px 104px 6px 22px;
+  flex-wrap: wrap;
+}
+
+.header-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.header-stats span {
+  align-items: center;
+  background: var(--chip-bg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--green-dark);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 6px 12px;
+}
+
+/* ===== Brand ===== */
+
+.brand-row {
+  align-items: center;
+  color: var(--green-dark);
+  display: inline-flex;
+  font-weight: 900;
+  gap: 10px;
+}
+
+.brand-icon {
+  align-items: center;
+  background: var(--green);
+  border-radius: 12px;
+  color: white;
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+/* ===== Progress Bar ===== */
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 999px;
+  transition: width 300ms ease;
+}

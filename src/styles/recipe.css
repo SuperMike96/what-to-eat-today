@@ -1,0 +1,154 @@
+/* ===== Recipe Card ===== */
+
+.recipe-card {
+  background: var(--chip-bg);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: 0 14px 44px rgba(79, 53, 28, 0.1);
+  display: grid;
+  gap: 0;
+  grid-template-columns: minmax(240px, 0.85fr) minmax(280px, 1.15fr);
+  max-height: min(64vh, 640px);
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+  touch-action: pan-y;
+}
+
+.recipe-card > img {
+  height: 100%;
+  min-height: 480px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.recipe-content {
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.recipe-title-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.recipe-title-row h2 {
+  font-size: 30px;
+  margin: 0 0 6px;
+}
+
+.recipe-title-row p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.recipe-content section {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+
+.recipe-content h3 {
+  margin: 0 0 8px;
+}
+
+.recipe-content li {
+  line-height: 1.8;
+  margin-bottom: 8px;
+}
+
+/* ===== Recipe draggable ===== */
+
+.recipe-card.dragging {
+  cursor: grabbing;
+  transition: none;
+  user-select: none;
+}
+
+.recipe-card.dragging img {
+  pointer-events: none;
+}
+
+.recipe-card.resting {
+  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.recipe-index-chip {
+  align-items: center;
+  background: rgba(47, 125, 85, 0.12);
+  border-radius: 999px;
+  color: var(--green-dark);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
+.recipe-media-placeholder {
+  align-items: center;
+  background: repeating-linear-gradient(45deg, rgba(47, 125, 85, 0.04), rgba(47, 125, 85, 0.04) 10px, rgba(47, 125, 85, 0.08) 10px, rgba(47, 125, 85, 0.08) 20px);
+  border: 1px dashed rgba(47, 125, 85, 0.3);
+  border-radius: 14px;
+  color: var(--muted);
+  display: flex;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 96px;
+  padding: 18px;
+  text-align: center;
+}
+
+.recipe-media-list {
+  display: grid;
+  gap: 12px;
+}
+
+.recipe-media-list figure { margin: 0; }
+.recipe-media-list img,
+.recipe-media-list video {
+  border-radius: 14px;
+  width: 100%;
+}
+
+.recipe-media-list figcaption {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.recipe-swipe-hint {
+  align-items: center;
+  background: rgba(31, 35, 32, 0.82);
+  backdrop-filter: blur(8px);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 900;
+  padding: 8px 14px;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+}
+
+.recipe-swipe-hint.prev { left: 18px; }
+.recipe-swipe-hint.next { right: 18px; }
+
+.recipe-swipe-tip {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+.recipe-page {
+  /* no extra rules needed, but reserved for page-level overrides */
+}

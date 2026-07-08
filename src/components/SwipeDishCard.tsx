@@ -1,13 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { Dish, SwipeActionKind } from "../types";
 import { useDragGesture } from "../hooks/useDragGesture";
 import { SWIPE_THRESHOLD, STAMP_THRESHOLD } from "../lib/constants";
 import { handleImageError } from "../lib/image";
 import { haptic } from "../lib/haptics";
-
-// Onboarding hint shows only on the very first card of a session, then stays
-// dismissed — keeps the experience clean on every subsequent dish.
-let introShown = false;
 
 type Stamp = { kind: SwipeActionKind; opacity: number };
 
@@ -30,7 +26,6 @@ export function SwipeDishCard({
   // When a swipe commits we play a fly-out animation, THEN notify the parent
   // so the next card mounts (R19).
   const [flying, setFlying] = useState<null | { x: number; y: number; rot: number }>(null);
-  const [showHint, setShowHint] = useState(!introShown);
   const tickedRef = useRef(false);
 
   const commit = (action: SwipeActionKind) => {
@@ -110,26 +105,12 @@ export function SwipeDishCard({
         ...(moving ? { boxShadow: dragShadow } : preview ? { boxShadow: previewShadow } : null),
       };
 
-  const dismissHint = () => {
-    if (!introShown) {
-      introShown = true;
-      setShowHint(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!showHint) return;
-    const timer = window.setTimeout(() => setShowHint(false), 5200);
-    return () => window.clearTimeout(timer);
-  }, [showHint]);
-
   return (
     <article
       className={`dish-card${moving ? " dragging" : resting ? " resting" : ""}${flying ? " flying" : ""}`}
       style={style}
       onPointerDown={(event) => {
         setResting(false);
-        dismissHint();
         gesture.onPointerDown(event);
       }}
       onPointerMove={gesture.onPointerMove}
@@ -147,13 +128,6 @@ export function SwipeDishCard({
       {stamp.opacity > 0.04 && (
         <div className={`swipe-stamp ${stamp.kind}`} style={{ opacity: Math.max(0.15, stamp.opacity) }}>
           {STAMP_STYLE[stamp.kind].label}
-        </div>
-      )}
-      {showHint && !flying && (
-        <div className="swipe-hint" aria-hidden="true">
-          <span className="hint-chevron left">‹</span>
-          <span className="hint-text">拖动卡片 · 右滑想吃 / 左滑跳过</span>
-          <span className="hint-chevron right">›</span>
         </div>
       )}
       <div className="dish-card-content">

@@ -1,0 +1,54 @@
+/* ===== Shopping ===== */
+
+.shopping-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.shopping-group {
+  background: var(--chip-bg);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: 0 14px 44px rgba(79, 53, 28, 0.1);
+  padding: 14px;
+}
+
+.shopping-group h2 {
+  font-size: 18px;
+  margin: 2px 0 12px;
+}
+
+.shopping-items {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.shopping-item {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 1fr auto;
+  min-height: 54px;
+  padding: 10px 12px;
+}
+
+.shopping-item input {
+  accent-color: var(--green);
+  height: 18px;
+  width: 18px;
+}
+
+.shopping-item strong {
+  color: var(--green-dark);
+}
+
+.shopping-item.checked span,
+.shopping-item.checked strong {
+  color: #939990;
+  text-decoration: line-through;
+}
