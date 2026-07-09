@@ -1,12 +1,10 @@
 export function CompactHeader({
   selectedCount,
   pendingCount,
-  remainingCount,
   onReset,
 }: {
   selectedCount: number;
   pendingCount: number;
-  remainingCount: number;
   onReset?: () => void;
 }) {
   return (
@@ -18,7 +16,6 @@ export function CompactHeader({
       <div className="header-stats">
         <span>{selectedCount} 已选</span>
         {pendingCount > 0 && <span>{pendingCount} 待定</span>}
-        <span>{remainingCount} 待看</span>
         {onReset && (
           <button className="header-reset" type="button" onClick={onReset}>
             重置
