@@ -10,8 +10,7 @@ export function CompactHeader({
   return (
     <header className="compact-header">
       <div className="brand-row">
-        <span className="brand-icon">食</span>
-        <span>今天吃什么</span>
+        <img className="brand-logo" src="/logo.png" alt="今晚吃什么" />
       </div>
       <div className="header-stats">
         <span>{selectedCount} 已选</span>

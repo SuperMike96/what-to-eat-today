@@ -154,22 +154,14 @@ button:disabled {
 .brand-row {
   align-items: center;
   align-self: center;
-  color: var(--green-dark);
   display: inline-flex;
-  font-weight: 900;
-  gap: 10px;
 }
 
-.brand-icon {
-  align-items: center;
-  align-self: center;
-  background: var(--green);
-  border-radius: 12px;
-  color: white;
-  display: inline-flex;
-  height: 36px;
-  justify-content: center;
-  width: 36px;
+.brand-logo {
+  height: clamp(32px, 5vw, 48px);
+  width: auto;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 /* ===== Card Detail Overlay (tap to expand) ===== */
